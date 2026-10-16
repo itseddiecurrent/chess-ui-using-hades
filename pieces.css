@@ -1,0 +1,10 @@
+@import url('https://cdn.jsdelivr.net/npm/chess-merida-font@0.0.3/css/chessmerida-webfont.min.css');
+
+/* Utility classes to render pieces via the Merida icon font [32] */
+.piece-font {
+  font-family: 'Chess Merida', 'chessmerida-webfont', sans-serif;
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* Mapping helpers: we will inject the right glyph code in JS by setting textContent */

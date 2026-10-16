@@ -57,6 +57,11 @@ const PIECE_GLYPHS = {
     w: { k: 'K', q: 'Q', r: 'R', b: 'B', n: 'N', p: '•' },
     b: { k: 'K', q: 'Q', r: 'R', b: 'B', n: 'N', p: '•' },
   },
+  // Merida icon font mapping (characters) [32]
+  merida: {
+    w: { k: '\u004B', q: '\u0051', r: '\u0052', b: '\u0042', n: '\u004E', p: '\u0050' },
+    b: { k: '\u006B', q: '\u0071', r: '\u0072', b: '\u0062', n: '\u006E', p: '\u0070' },
+  },
 };
 
 function savePrefs() {
@@ -120,12 +125,27 @@ function buildBoard() {
       sqEl.role = 'gridcell';
 
       if (sqData) {
-        const pieceEl = document.createElement('span');
-        const style = PIECE_GLYPHS[pieceStyle.value] || PIECE_GLYPHS.unicode;
-        pieceEl.textContent = style[sqData.color][sqData.type];
-        pieceEl.className = `piece ${sqData.color === 'w' ? 'white' : 'black'}`;
-        pieceEl.style.color = sqData.color === 'w' ? getComputedStyle(document.documentElement).getPropertyValue('--piece-w') : getComputedStyle(document.documentElement).getPropertyValue('--piece-b');
-        sqEl.appendChild(pieceEl);
+        const styleKey = pieceStyle.value;
+        if (styleKey === 'cburnett') {
+          // SVG image pieces from Wikimedia Commons [19]
+          const url = PIECE_SVGS.cburnett[sqData.color][sqData.type];
+          const wrap = document.createElement('span');
+          wrap.className = `piece img ${sqData.color === 'w' ? 'white' : 'black'}`;
+          const img = document.createElement('img');
+          img.alt = `${sqData.color === 'w' ? 'White' : 'Black'} ${sqData.type}`;
+          img.decoding = 'async';
+          img.loading = 'lazy';
+          img.src = url;
+          wrap.appendChild(img);
+          sqEl.appendChild(wrap);
+        } else {
+          const pieceEl = document.createElement('span');
+          const glyphSet = PIECE_GLYPHS[styleKey] || PIECE_GLYPHS.unicode;
+          pieceEl.textContent = glyphSet[sqData.color][sqData.type];
+          pieceEl.className = `piece ${styleKey === 'merida' ? 'font' : ''} ${sqData.color === 'w' ? 'white' : 'black'}`.trim();
+          pieceEl.style.color = sqData.color === 'w' ? getComputedStyle(document.documentElement).getPropertyValue('--piece-w') : getComputedStyle(document.documentElement).getPropertyValue('--piece-b');
+          sqEl.appendChild(pieceEl);
+        }
       }
 
       sqEl.addEventListener('click', () => onSquareClick(sq));
@@ -402,5 +422,24 @@ hdrBlack.addEventListener('input', updatePGN);
 loadPrefs();
 refreshBoard();
 
-// Docs references
-// chess.isGameOver(), chess.isDraw(), chess.inCheck() documented in npm readme [14]
+const PIECE_SVGS = {
+  // Cburnett set from Wikimedia (SVG chess pieces) [19]
+  cburnett: {
+    w: {
+      k: 'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg',
+      q: 'https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg',
+      r: 'https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg',
+      b: 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg',
+      n: 'https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg',
+      p: 'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg',
+    },
+    b: {
+      k: 'https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg',
+      q: 'https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg',
+      r: 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg',
+      b: 'https://upload.wikimedia.org/wikipedia/commons/9/98/Chess_bdt45.svg',
+      n: 'https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_ndt45.svg',
+      p: 'https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg',
+    }
+  }
+};
