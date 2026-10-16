@@ -7,6 +7,7 @@
   --accent: #1f6feb;
   --ok: #1a7f37;
   --warn: #a371f7;
+  --piece-scale: 0.98; /* default 98% fill */
 }
 body {
   margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -30,8 +31,8 @@ body {
 .piece { font-weight: 700; text-shadow: 0 1px 0 rgba(0,0,0,.1); display:flex; align-items:center; justify-content:center; }
 .piece.white { color: var(--piece-w); -webkit-text-stroke: 1px rgba(0,0,0,.2); text-stroke: 1px rgba(0,0,0,.2); }
 .piece.black { color: var(--piece-b); }
-.piece.font { font-family: 'Chess Merida', 'chessmerida-webfont', system-ui, sans-serif; }
-.piece.img img { width: 90%; height: 90%; object-fit: contain; filter: drop-shadow(0 1px 0 rgba(0,0,0,.1)); }
+.piece.font { font-family: 'Chess Merida', 'chessmerida-webfont', system-ui, sans-serif; transform: scale(var(--piece-scale)); }
+.piece.img img { width: calc(var(--piece-scale) * 100%); height: calc(var(--piece-scale) * 100%); object-fit: contain; filter: drop-shadow(0 1px 0 rgba(0,0,0,.1)); }
 
 .side-panel { display:flex; flex-direction: column; gap: 16px; }
 .controls, .moves, .pgn { background:#fff; border:1px solid #e5e5e5; border-radius:8px; padding:12px; }

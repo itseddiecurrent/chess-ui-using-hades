@@ -20,8 +20,8 @@ const darkColor = document.getElementById('darkColor');
 const pieceStyle = document.getElementById('pieceStyle');
 const whitePieceColor = document.getElementById('whitePieceColor');
 const blackPieceColor = document.getElementById('blackPieceColor');
-const showCoords = document.getElementById('showCoords');
-const highlightMoves = document.getElementById('highlightMoves');
+const pieceSize = document.getElementById('pieceSize');
+const pieceSizeVal = document.getElementById('pieceSizeVal');
 
 // PGN Header fields
 const hdrEvent = document.getElementById('hdrEvent');
@@ -29,7 +29,9 @@ const hdrSite = document.getElementById('hdrSite');
 const hdrDate = document.getElementById('hdrDate');
 const hdrRound = document.getElementById('hdrRound');
 const hdrWhite = document.getElementById('hdrWhite');
-const hdrBlack = document.getElementById('hdrBlack');
+const pieceSize = document.getElementById('pieceSize');
+const pieceSizeVal = document.getElementById('pieceSizeVal');
+
 
 // Promotion dialog
 const promoDialog = document.getElementById('promotionDialog');
@@ -74,8 +76,8 @@ function savePrefs() {
     showCoords: showCoords.checked,
     highlight: highlightMoves.checked,
     orientation,
-  };
-  localStorage.setItem('chessRecorderPrefs', JSON.stringify(prefs));
+    pieceScale: pieceSize ? Number(pieceSize.value) : 98,
+
 }
 function loadPrefs() {
   try {
@@ -89,8 +91,17 @@ function loadPrefs() {
     blackPieceColor.value = p.black ?? blackPieceColor.value;
     showCoords.checked = p.showCoords ?? showCoords.checked;
     highlightMoves.checked = p.highlight ?? highlightMoves.checked;
-    orientation = p.orientation ?? orientation;
-  } catch {}
+    if (typeof p.pieceScale === 'number' && pieceSize) {
+      pieceSize.value = String(p.pieceScale);
+    }
+    applyPieceScale();
+
+
+function applyPieceScale() {
+  const scale = pieceSize ? Number(pieceSize.value) : 98;
+  const clamped = Math.max(85, Math.min(100, scale));
+  document.documentElement.style.setProperty('--piece-scale', String(clamped / 100));
+  if (pieceSizeVal) pieceSizeVal.textContent = `${clamped}%`;
 }
 
 function coordToIndex(file, rank) {
@@ -404,8 +415,10 @@ darkColor.addEventListener('input', () => { savePrefs(); refreshBoard(); });
 pieceStyle.addEventListener('change', () => { savePrefs(); refreshBoard(); });
 whitePieceColor.addEventListener('input', () => { savePrefs(); refreshBoard(); });
 blackPieceColor.addEventListener('input', () => { savePrefs(); refreshBoard(); });
-showCoords.addEventListener('change', () => { savePrefs(); renderCoords(); });
-highlightMoves.addEventListener('change', () => { savePrefs(); refreshBoard(); });
+if (pieceSize) {
+  pieceSize.addEventListener('input', () => { applyPieceScale(); savePrefs(); });
+}
+
 
 document.getElementById('copyPgnBtn').addEventListener('click', copyPgn);
 document.getElementById('downloadPgnBtn').addEventListener('click', downloadPgn);
@@ -418,28 +431,30 @@ hdrRound.addEventListener('input', updatePGN);
 hdrWhite.addEventListener('input', updatePGN);
 hdrBlack.addEventListener('input', updatePGN);
 
+// Piece size display and persistence
+if (pieceSize) {
+  pieceSize.addEventListener('input', () => { applyPieceScale(); savePrefs(); });
+}
+
 // Init
 loadPrefs();
+applyPieceScale();
 refreshBoard();
 
 const PIECE_SVGS = {
-  // Cburnett set from Wikimedia (SVG chess pieces) [19]
+  // Cburnett set from Wikimedia Commons [19]
   cburnett: {
-    w: {
-      k: 'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg',
-      q: 'https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg',
-      r: 'https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg',
-      b: 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg',
-      n: 'https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg',
-      p: 'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg',
-    },
-    b: {
-      k: 'https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg',
-      q: 'https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg',
-      r: 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg',
-      b: 'https://upload.wikimedia.org/wikipedia/commons/9/98/Chess_bdt45.svg',
-      n: 'https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_ndt45.svg',
-      p: 'https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg',
-    }
+    w: { k: 'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg', q: 'https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg', r: 'https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg', b: 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg', n: 'https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg', p: 'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg' },
+    b: { k: 'https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg', q: 'https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg', r: 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg', b: 'https://upload.wikimedia.org/wikipedia/commons/9/98/Chess_bdt45.svg', n: 'https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_ndt45.svg', p: 'https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg' }
+  },
+  // Skak SVG set [37]
+  skak: {
+    w: { k: 'https://raw.githubusercontent.com/MuTsunTsai/skak-svg/main/svg/wk.svg', q: 'https://raw.githubusercontent.com/MuTsunTsai/skak-svg/main/svg/wq.svg', r: 'https://raw.githubusercontent.com/MuTsunTsai/skak-svg/main/svg/wr.svg', b: 'https://raw.githubusercontent.com/MuTsunTsai/skak-svg/main/svg/wb.svg', n: 'https://raw.githubusercontent.com/MuTsunTsai/skak-svg/main/svg/wn.svg', p: 'https://raw.githubusercontent.com/MuTsunTsai/skak-svg/main/svg/wp.svg' },
+    b: { k: 'https://raw.githubusercontent.com/MuTsunTsai/skak-svg/main/svg/bk.svg', q: 'https://raw.githubusercontent.com/MuTsunTsai/skak-svg/main/svg/bq.svg', r: 'https://raw.githubusercontent.com/MuTsunTsai/skak-svg/main/svg/br.svg', b: 'https://raw.githubusercontent.com/MuTsunTsai/skak-svg/main/svg/bb.svg', n: 'https://raw.githubusercontent.com/MuTsunTsai/skak-svg/main/svg/bn.svg', p: 'https://raw.githubusercontent.com/MuTsunTsai/skak-svg/main/svg/bp.svg' }
+  },
+  // 1echecs SVG set [39]
+  '1echecs': {
+    w: { k: 'https://raw.githubusercontent.com/MuTsunTsai/1echecs-svg/main/svg/wk.svg', q: 'https://raw.githubusercontent.com/MuTsunTsai/1echecs-svg/main/svg/wq.svg', r: 'https://raw.githubusercontent.com/MuTsunTsai/1echecs-svg/main/svg/wr.svg', b: 'https://raw.githubusercontent.com/MuTsunTsai/1echecs-svg/main/svg/wb.svg', n: 'https://raw.githubusercontent.com/MuTsunTsai/1echecs-svg/main/svg/wn.svg', p: 'https://raw.githubusercontent.com/MuTsunTsai/1echecs-svg/main/svg/wp.svg' },
+    b: { k: 'https://raw.githubusercontent.com/MuTsunTsai/1echecs-svg/main/svg/bk.svg', q: 'https://raw.githubusercontent.com/MuTsunTsai/1echecs-svg/main/svg/bq.svg', r: 'https://raw.githubusercontent.com/MuTsunTsai/1echecs-svg/main/svg/br.svg', b: 'https://raw.githubusercontent.com/MuTsunTsai/1echecs-svg/main/svg/bb.svg', n: 'https://raw.githubusercontent.com/MuTsunTsai/1echecs-svg/main/svg/bn.svg', p: 'https://raw.githubusercontent.com/MuTsunTsai/1echecs-svg/main/svg/bp.svg' }
   }
 };
