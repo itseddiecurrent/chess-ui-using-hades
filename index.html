@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chess Recorder</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>Chess Recording Interface</h1>
+    <div class="header-actions">
+      <button id="newGameBtn" title="Start a new game">New game</button>
+      <button id="flipBtn" title="Flip board orientation">Flip</button>
+      <button id="undoBtn" title="Undo last move">Undo</button>
+      <button id="redoBtn" title="Redo move">Redo</button>
+      <span id="status" role="status" aria-live="polite"></span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="board-panel">
+      <div id="board" class="board" aria-label="Chessboard" role="grid"></div>
+      <div class="coord-files" aria-hidden="true"></div>
+      <div class="coord-ranks" aria-hidden="true"></div>
+    </section>
+
+    <aside class="side-panel">
+      <section class="controls">
+        <h2>Customization</h2>
+        <div class="control-row">
+          <label>Light squares <input type="color" id="lightColor" value="#F0D9B5" /></label>
+          <label>Dark squares <input type="color" id="darkColor" value="#B58863" /></label>
+        </div>
+        <div class="control-row">
+          <label>Piece style
+            <select id="pieceStyle">
+              <option value="unicode">Unicode</option>
+              <option value="alpha">Alpha (letters)</option>
+              <option value="minimal">Minimal</option>
+            </select>
+          </label>
+        </div>
+        <div class="control-row">
+          <label>White piece color <input type="color" id="whitePieceColor" value="#ffffff" /></label>
+          <label>Black piece color <input type="color" id="blackPieceColor" value="#111111" /></label>
+        </div>
+        <div class="control-row small">
+          <label><input type="checkbox" id="showCoords" checked /> Show coordinates</label>
+          <label><input type="checkbox" id="highlightMoves" checked /> Highlight legal moves</label>
+        </div>
+      </section>
+
+      <section class="moves">
+        <h2>Moves</h2>
+        <ol id="moveList" class="move-list" aria-live="polite"></ol>
+      </section>
+
+      <section class="pgn">
+        <h2>PGN</h2>
+        <div class="pgn-actions">
+          <button id="copyPgnBtn">Copy</button>
+          <button id="downloadPgnBtn">Download</button>
+          <button id="loadPgnBtn">Load from text</button>
+        </div>
+        <textarea id="pgnText" rows="8" placeholder="PGN will appear here...\nYou can also paste a PGN and click 'Load from text'."></textarea>
+        <div class="pgn-headers">
+          <details>
+            <summary>Headers</summary>
+            <div class="control-row">
+              <label>Event <input id="hdrEvent" type="text" placeholder="-" /></label>
+              <label>Site <input id="hdrSite" type="text" placeholder="-" /></label>
+            </div>
+            <div class="control-row">
+              <label>Date <input id="hdrDate" type="text" placeholder="YYYY.MM.DD" /></label>
+              <label>Round <input id="hdrRound" type="text" placeholder="-" /></label>
+            </div>
+            <div class="control-row">
+              <label>White <input id="hdrWhite" type="text" placeholder="White player" /></label>
+              <label>Black <input id="hdrBlack" type="text" placeholder="Black player" /></label>
+            </div>
+          </details>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <!-- Promotion dialog -->
+  <dialog id="promotionDialog">
+    <form method="dialog" id="promotionForm">
+      <h3>Choose promotion</h3>
+      <div class="promo-options">
+        <button value="q" class="promo-opt" data-piece="q" type="submit" aria-label="Promote to queen">Q</button>
+        <button value="r" class="promo-opt" data-piece="r" type="submit" aria-label="Promote to rook">R</button>
+        <button value="b" class="promo-opt" data-piece="b" type="submit" aria-label="Promote to bishop">B</button>
+        <button value="n" class="promo-opt" data-piece="n" type="submit" aria-label="Promote to knight">N</button>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" id="cancelPromotion">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

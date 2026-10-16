@@ -1,0 +1,406 @@
+// Chess Recorder App
+// Uses chess.js for rules / SAN / PGN (via ESM CDN)
+// ESM import note: if offline, swap to a local copy of chess.js
+import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dist/esm/chess.js';
+
+const boardEl = document.getElementById('board');
+const moveListEl = document.getElementById('moveList');
+const statusEl = document.getElementById('status');
+const pgnText = document.getElementById('pgnText');
+
+// Controls
+const newGameBtn = document.getElementById('newGameBtn');
+const flipBtn = document.getElementById('flipBtn');
+const undoBtn = document.getElementById('undoBtn');
+const redoBtn = document.getElementById('redoBtn');
+
+// Customization controls
+const lightColor = document.getElementById('lightColor');
+const darkColor = document.getElementById('darkColor');
+const pieceStyle = document.getElementById('pieceStyle');
+const whitePieceColor = document.getElementById('whitePieceColor');
+const blackPieceColor = document.getElementById('blackPieceColor');
+const showCoords = document.getElementById('showCoords');
+const highlightMoves = document.getElementById('highlightMoves');
+
+// PGN Header fields
+const hdrEvent = document.getElementById('hdrEvent');
+const hdrSite = document.getElementById('hdrSite');
+const hdrDate = document.getElementById('hdrDate');
+const hdrRound = document.getElementById('hdrRound');
+const hdrWhite = document.getElementById('hdrWhite');
+const hdrBlack = document.getElementById('hdrBlack');
+
+// Promotion dialog
+const promoDialog = document.getElementById('promotionDialog');
+const promoForm = document.getElementById('promotionForm');
+const cancelPromotion = document.getElementById('cancelPromotion');
+
+// State
+let chess = new Chess();
+let orientation = 'w'; // 'w' at bottom or 'b'
+let selectedSquare = null;
+let legalTargets = [];
+let redoStack = [];
+
+// Piece rendering presets
+const PIECE_GLYPHS = {
+  unicode: {
+    w: { k: '♔', q: '♕', r: '♖', b: '♗', n: '♘', p: '♙' },
+    b: { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' },
+  },
+  alpha: {
+    w: { k: 'K', q: 'Q', r: 'R', b: 'B', n: 'N', p: 'P' },
+    b: { k: 'k', q: 'q', r: 'r', b: 'b', n: 'n', p: 'p' },
+  },
+  minimal: {
+    w: { k: 'K', q: 'Q', r: 'R', b: 'B', n: 'N', p: '•' },
+    b: { k: 'K', q: 'Q', r: 'R', b: 'B', n: 'N', p: '•' },
+  },
+};
+
+function savePrefs() {
+  const prefs = {
+    light: lightColor.value,
+    dark: darkColor.value,
+    style: pieceStyle.value,
+    white: whitePieceColor.value,
+    black: blackPieceColor.value,
+    showCoords: showCoords.checked,
+    highlight: highlightMoves.checked,
+    orientation,
+  };
+  localStorage.setItem('chessRecorderPrefs', JSON.stringify(prefs));
+}
+function loadPrefs() {
+  try {
+    const raw = localStorage.getItem('chessRecorderPrefs');
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    lightColor.value = p.light ?? lightColor.value;
+    darkColor.value = p.dark ?? darkColor.value;
+    pieceStyle.value = p.style ?? pieceStyle.value;
+    whitePieceColor.value = p.white ?? whitePieceColor.value;
+    blackPieceColor.value = p.black ?? blackPieceColor.value;
+    showCoords.checked = p.showCoords ?? showCoords.checked;
+    highlightMoves.checked = p.highlight ?? highlightMoves.checked;
+    orientation = p.orientation ?? orientation;
+  } catch {}
+}
+
+function coordToIndex(file, rank) {
+  // file: a..h rank: 1..8
+  const f = file.charCodeAt(0) - 97; // a=0
+  const r = rank - 1; // 0..7 bottom is rank 1 (white orientation)
+  // UI orientation flips display order, not mapping
+  return r * 8 + f;
+}
+
+function indexToCoord(idx) {
+  const r = Math.floor(idx / 8); // 0..7
+  const f = idx % 8; // 0..7
+  const file = String.fromCharCode(97 + f);
+  const rank = 1 + r;
+  return file + rank;
+}
+
+function buildBoard() {
+  boardEl.innerHTML = '';
+  const board = chess.board(); // 8x8 array, a8..h1 by rows
+  for (let rank = 8; rank >= 1; rank--) {
+    for (let f = 0; f < 8; f++) {
+      const file = String.fromCharCode(97 + f);
+      const sq = file + rank;
+      const sqData = chess.get(sq);
+      const sqEl = document.createElement('div');
+      sqEl.className = 'square';
+      const isLight = ((file.charCodeAt(0) - 97) + (rank - 1)) % 2 === 0;
+      sqEl.classList.add(isLight ? 'light' : 'dark');
+      sqEl.dataset.square = sq;
+      sqEl.role = 'gridcell';
+
+      if (sqData) {
+        const pieceEl = document.createElement('span');
+        const style = PIECE_GLYPHS[pieceStyle.value] || PIECE_GLYPHS.unicode;
+        pieceEl.textContent = style[sqData.color][sqData.type];
+        pieceEl.className = `piece ${sqData.color === 'w' ? 'white' : 'black'}`;
+        pieceEl.style.color = sqData.color === 'w' ? getComputedStyle(document.documentElement).getPropertyValue('--piece-w') : getComputedStyle(document.documentElement).getPropertyValue('--piece-b');
+        sqEl.appendChild(pieceEl);
+      }
+
+      sqEl.addEventListener('click', () => onSquareClick(sq));
+      boardEl.appendChild(sqEl);
+    }
+  }
+  applyOrientation();
+  renderCoords();
+}
+
+function applyOrientation() {
+  const squares = Array.from(boardEl.children);
+  if (orientation === 'w') return; // default order already has a8..h1, but we want h1 at end
+  // Reverse for black-at-bottom: simply reverse the DOM order
+  squares.reverse().forEach((el) => boardEl.appendChild(el));
+}
+
+function renderCoords() {
+  const filesEl = document.querySelector('.coord-files');
+  const ranksEl = document.querySelector('.coord-ranks');
+  filesEl.innerHTML = '';
+  ranksEl.innerHTML = '';
+  const files = orientation === 'w' ? ['a','b','c','d','e','f','g','h'] : ['h','g','f','e','d','c','b','a'];
+  const ranks = orientation === 'w' ? ['1','2','3','4','5','6','7','8'] : ['8','7','6','5','4','3','2','1'];
+  files.forEach(f => { const s = document.createElement('span'); s.textContent = f; filesEl.appendChild(s); });
+  ranks.forEach(r => { const s = document.createElement('span'); s.textContent = r; ranksEl.appendChild(s); });
+  const show = showCoords.checked;
+  filesEl.style.display = show ? 'grid' : 'none';
+  ranksEl.style.display = show ? 'grid' : 'none';
+}
+
+function refreshBoard() {
+  // Repaint pieces and colors only
+  document.documentElement.style.setProperty('--light', lightColor.value);
+  document.documentElement.style.setProperty('--dark', darkColor.value);
+  document.documentElement.style.setProperty('--piece-w', whitePieceColor.value);
+  document.documentElement.style.setProperty('--piece-b', blackPieceColor.value);
+
+  // Rebuild contents to reflect moves and piece style
+  buildBoard();
+  // Highlight if applicable
+  if (selectedSquare) highlightSquares(selectedSquare);
+  updateStatus();
+  updateMoves();
+  updatePGN();
+}
+
+function updateStatus() {
+  let status = chess.turn() === 'w' ? 'White' : 'Black';
+  if (chess.isCheckmate()) status += ' to move — checkmate.';
+  else if (chess.isDraw()) status += ' to move — draw.';
+  else if (chess.inCheck()) status += ' to move — check!';
+  else status += ' to move.';
+  statusEl.textContent = status;
+}
+
+function updateMoves() {
+  // Render SAN list as an ordered list
+  moveListEl.innerHTML = '';
+  const history = chess.history({ verbose: true });
+  let line = [];
+  history.forEach((m, i) => {
+    const turnNumber = Math.floor(i / 2) + 1;
+    if (i % 2 === 0) {
+      line = document.createElement('li');
+      line.textContent = `${turnNumber}. ${m.san}`;
+      moveListEl.appendChild(line);
+    } else {
+      line.textContent += `  ${m.san}`;
+    }
+  });
+  // Scroll to bottom
+  moveListEl.parentElement?.scrollTo({ top: moveListEl.scrollHeight });
+}
+
+function updatePGN() {
+  const headers = {};
+  if (hdrEvent.value) headers.Event = hdrEvent.value;
+  if (hdrSite.value) headers.Site = hdrSite.value;
+  if (hdrDate.value) headers.Date = hdrDate.value;
+  if (hdrRound.value) headers.Round = hdrRound.value;
+  if (hdrWhite.value) headers.White = hdrWhite.value;
+  if (hdrBlack.value) headers.Black = hdrBlack.value;
+  chess.header(...Object.entries(headers).flat());
+  pgnText.value = chess.pgn();
+}
+
+function clearHighlights() {
+  for (const el of boardEl.querySelectorAll('.square')) {
+    el.classList.remove('highlight', 'legal', 'capture', 'selected');
+  }
+}
+
+function highlightSquares(from) {
+  clearHighlights();
+  const fromEl = [...boardEl.children].find(el => el.dataset.square === from);
+  if (fromEl) fromEl.classList.add('selected');
+  if (!highlightMoves.checked) return;
+  const moves = chess.moves({ square: from, verbose: true });
+  for (const m of moves) {
+    const toEl = [...boardEl.children].find(el => el.dataset.square === m.to);
+    if (!toEl) continue;
+    toEl.classList.add(m.captured ? 'capture' : 'legal');
+  }
+}
+
+function onSquareClick(sq) {
+  // If selecting first square
+  if (!selectedSquare) {
+    const piece = chess.get(sq);
+    if (!piece) return; // empty square
+    selectedSquare = sq;
+    legalTargets = chess.moves({ square: sq, verbose: true }).map(m => m.to);
+    highlightSquares(sq);
+    return;
+  }
+
+  if (sq === selectedSquare) {
+    selectedSquare = null;
+    legalTargets = [];
+    clearHighlights();
+    return;
+  }
+
+  // Try move
+  const isPromotionAttempt = isPromotionMove(selectedSquare, sq);
+  if (isPromotionAttempt) {
+    // Open dialog and wait
+    openPromotionDialog(selectedSquare, sq).then((promotionPiece) => {
+      if (!promotionPiece) return; // canceled
+      tryMove(selectedSquare, sq, promotionPiece);
+    });
+  } else {
+    tryMove(selectedSquare, sq, undefined);
+  }
+}
+
+function isPromotionMove(from, to) {
+  const piece = chess.get(from);
+  if (!piece || piece.type !== 'p') return false;
+  const rank = parseInt(to[1], 10);
+  return (piece.color === 'w' && rank === 8) || (piece.color === 'b' && rank === 1);
+}
+
+function openPromotionDialog(from, to) {
+  return new Promise((resolve) => {
+    const onSubmit = (ev) => {
+      ev.preventDefault();
+      const btn = ev.submitter; // clicked button
+      if (!btn) return resolve(null);
+      const piece = btn.getAttribute('data-piece');
+      cleanup();
+      resolve(piece);
+    };
+    const onCancel = () => { cleanup(); resolve(null); };
+    function cleanup() {
+      promoForm.removeEventListener('submit', onSubmit);
+      cancelPromotion.removeEventListener('click', onCancel);
+      promoDialog.close();
+    }
+    promoForm.addEventListener('submit', onSubmit);
+    cancelPromotion.addEventListener('click', onCancel);
+    promoDialog.showModal();
+  });
+}
+
+function tryMove(from, to, promotion) {
+  const move = { from, to, promotion };
+  const result = chess.move(move);
+  if (result) {
+    selectedSquare = null;
+    legalTargets = [];
+    redoStack = []; // new branch clears redo
+    clearHighlights();
+    refreshBoard();
+  } else {
+    // illegal move feedback
+    const fromEl = [...boardEl.children].find(el => el.dataset.square === from);
+    const toEl = [...boardEl.children].find(el => el.dataset.square === to);
+    [fromEl, toEl].forEach(el => { if (el) el.classList.add('highlight'); });
+    setTimeout(clearHighlights, 600);
+  }
+}
+
+function newGame() {
+  chess = new Chess();
+  redoStack = [];
+  selectedSquare = null;
+  legalTargets = [];
+  refreshBoard();
+}
+
+function flipBoard() {
+  orientation = orientation === 'w' ? 'b' : 'w';
+  savePrefs();
+  refreshBoard();
+}
+
+function undo() {
+  const mv = chess.undo();
+  if (mv) redoStack.push(mv);
+  refreshBoard();
+}
+
+function redo() {
+  if (redoStack.length === 0) return;
+  const mv = redoStack.pop();
+  if (!mv) return;
+  chess.move({ from: mv.from, to: mv.to, promotion: mv.promotion });
+  refreshBoard();
+}
+
+function copyPgn() {
+  updatePGN();
+  navigator.clipboard.writeText(pgnText.value).then(() => {
+    statusEl.textContent = 'PGN copied to clipboard';
+    setTimeout(updateStatus, 1200);
+  }).catch(() => {
+    statusEl.textContent = 'Copy failed';
+    setTimeout(updateStatus, 1200);
+  });
+}
+
+function downloadPgn() {
+  updatePGN();
+  const blob = new Blob([pgnText.value], { type: 'application/x-chess-pgn' });
+  const a = document.createElement('a');
+  const date = new Date().toISOString().slice(0,10);
+  a.download = `game-${date}.pgn`;
+  a.href = URL.createObjectURL(blob);
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function loadFromText() {
+  const text = pgnText.value.trim();
+  if (!text) return;
+  const ok = chess.loadPgn(text, { sloppy: true });
+  if (ok) {
+    redoStack = [];
+    refreshBoard();
+  } else {
+    statusEl.textContent = 'Failed to parse PGN';
+    setTimeout(updateStatus, 1200);
+  }
+}
+
+// Event listeners
+newGameBtn.addEventListener('click', newGame);
+flipBtn.addEventListener('click', flipBoard);
+undoBtn.addEventListener('click', undo);
+redoBtn.addEventListener('click', redo);
+
+lightColor.addEventListener('input', () => { savePrefs(); refreshBoard(); });
+darkColor.addEventListener('input', () => { savePrefs(); refreshBoard(); });
+pieceStyle.addEventListener('change', () => { savePrefs(); refreshBoard(); });
+whitePieceColor.addEventListener('input', () => { savePrefs(); refreshBoard(); });
+blackPieceColor.addEventListener('input', () => { savePrefs(); refreshBoard(); });
+showCoords.addEventListener('change', () => { savePrefs(); renderCoords(); });
+highlightMoves.addEventListener('change', () => { savePrefs(); refreshBoard(); });
+
+document.getElementById('copyPgnBtn').addEventListener('click', copyPgn);
+document.getElementById('downloadPgnBtn').addEventListener('click', downloadPgn);
+document.getElementById('loadPgnBtn').addEventListener('click', loadFromText);
+
+hdrEvent.addEventListener('input', updatePGN);
+hdrSite.addEventListener('input', updatePGN);
+hdrDate.addEventListener('input', updatePGN);
+hdrRound.addEventListener('input', updatePGN);
+hdrWhite.addEventListener('input', updatePGN);
+hdrBlack.addEventListener('input', updatePGN);
+
+// Init
+loadPrefs();
+refreshBoard();
+
+// Docs references
+// chess.isGameOver(), chess.isDraw(), chess.inCheck() documented in npm readme [14]
